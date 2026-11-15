@@ -42,7 +42,7 @@ const photoFile = photoDialog.querySelector('[type="file"]');
 const labelField = (label, value, optional = false) => ({label, value, optional});
 const textField = (label, value) => ({label, value, type: 'text'});
 
-function describeEdit(key) {
+function describeEdit(key, draft) {
   if (key === 'profile') {
     return {
       title: 'Обо мне',
@@ -70,13 +70,13 @@ function describeEdit(key) {
     };
   }
 
-  const item = profile[section].find(entry => entry.id === id);
+  const item = draft || profile[section].find(entry => entry.id === id);
   const names = section === 'experience' ? ['name', 'summary', 'role', 'dates'] : ['name', 'summary', 'status'];
   const labels = {name: 'Название', summary: 'Краткое описание', role: 'Должность', dates: 'Период', status: 'Статус'};
   return {
     title: item.name,
     fields: [
-      ...names.map(name => name === 'summary' ? textField(labels[name], item[name]) : labelField(labels[name], item[name] || '', name === 'status')),
+      ...names.map(name => name === 'summary' ? textField(labels[name], item[name] || '') : labelField(labels[name], item[name] || '', name === 'status')),
       textField('Подробности', item.details.join('\n\n'))
     ],
     apply(values) {
@@ -179,6 +179,37 @@ function openEditor() {
   currentEdit = {edits, profileEdit: edits.find(edit => edit.key === 'profile'), files: new Map(), uploads: new Map()};
   document.body.classList.add('inline-editing');
   bar.querySelector('[data-cancel]').focus({preventScroll: true});
+  if (location.hash === '#projects') {
+    const list = content.querySelector('.projects');
+    const add = document.createElement('button');
+    add.className = 'add-image';
+    add.type = 'button';
+    add.textContent = '+ Добавить проект';
+    list.after(add);
+    add.addEventListener('click', () => {
+      if (!busy) addProject(list);
+    });
+  }
+}
+
+function addProject(list) {
+  const id = 'project-' + crypto.randomUUID().replaceAll('-', '');
+  const key = 'projects/' + id;
+  const entry = document.createElement('article');
+  entry.className = 'record project-draft';
+  entry.innerHTML = `<h2 data-edit-type="label" data-placeholder="Название проекта"></h2>
+    <div class="record-description" data-edit-type="text"></div>
+    <div class="detail-text" data-edit-type="text"></div>`;
+  const edit = describeEdit(key, {id, details: []});
+  list.append(entry);
+  const [title, summary, details] = entry.children;
+  activateField(edit.fields[0], title);
+  activateField(edit.fields[1], summary);
+  activateField(edit.fields[3], details);
+  edit.fields[1].input.placeholder = 'Краткое описание';
+  edit.fields[3].input.placeholder = 'Подробности проекта';
+  currentEdit.edits.push({...edit, key, originalValues: ['', '', '', '']});
+  title.focus();
 }
 
 launch.addEventListener('click', openEditor);

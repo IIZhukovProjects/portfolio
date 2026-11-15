@@ -157,3 +157,19 @@ def test_member_never_receives_admin_session():
     assert login(client, provider).headers["Location"] == "/admin/?error=forbidden"
     assert client.cookies.get(SESSION_COOKIE) is None
     assert client.get("/api/v1/admin/session").status_code == 401
+
+
+def test_administrator_can_publish_a_new_project():
+    client, provider, _ = setup()
+    assert login(client, provider).headers["Location"] == "/admin/"
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": client.get("/api/v1/admin/session").json()["csrf"]}
+    identifier = "project-" + "a" * 32
+    result = client.patch("/api/v1/admin/content", headers=headers, json={
+        "revision": 1, "edits": [{
+            "key": f"projects/{identifier}", "values": ["Demo", "Summary", "", "**Details**"],
+        }],
+    })
+    assert result.status_code == 200
+    assert client.get("/api/v1/content").json()["document"]["projects"][0] == {
+        "id": identifier, "name": "Demo", "summary": "Summary", "status": "", "details": ["**Details**"],
+    }

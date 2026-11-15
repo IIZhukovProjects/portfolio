@@ -1,4 +1,5 @@
 from copy import deepcopy
+import re
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, insert
@@ -70,13 +71,17 @@ def edit_document(document, edits):
         if section in ("projects", "experience"):
             item = next((entry for entry in result.get(section, []) if entry["id"] == item_id), None)
             fields = ("name", "summary", "status") if section == "projects" else ("name", "summary", "role", "dates")
-            if item and len(values) == len(fields) + 1 and all(
+            if len(values) == len(fields) + 1 and all(
                 value.strip() or (section == "projects" and index == 2)
                 for index, value in enumerate(values)
             ):
-                item.update(zip(fields, values[:-1]))
-                item["details"] = [values[-1]]
-                continue
+                if item is None and section == "projects" and re.fullmatch(r"project-[a-f0-9]{32}", item_id):
+                    item = {"id": item_id}
+                    result.setdefault("projects", []).append(item)
+                if item is not None:
+                    item.update(zip(fields, values[:-1]))
+                    item["details"] = [values[-1]]
+                    continue
         raise HTTPException(422, "Проверь поля записи.")
     return result
 
