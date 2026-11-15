@@ -48,11 +48,11 @@ class Repository:
     async def get_content(self):
         return self.content
 
-    async def save_content(self, revision, edits):
+    async def save_content(self, revision, edits, **list_changes):
         if revision != self.content["revision"]:
             raise HTTPException(409)
         self.content = {
-            "document": edit_document(self.content["document"], edits),
+            "document": edit_document(self.content["document"], edits, **list_changes),
             "revision": revision + 1,
         }
         return self.content
@@ -93,8 +93,10 @@ class Provider:
         return httpx.Response(200, json={"sub": "user-1", "platformRole": self.role})
 
 
-def setup():
+def setup(document=None):
     database, storage, provider = Repository(), Storage(), Provider()
+    if document is not None:
+        database.content["document"] = document
     settings = SimpleNamespace(
         portfolio_origin=ORIGIN, oidc_issuer=ISSUER, oidc_client_id="portfolio",
         oidc_client_secret=SecretStr("testing-client-secret"), portfolio_media_base=PUBLIC_S3,
@@ -173,3 +175,24 @@ def test_administrator_can_publish_a_new_project():
     assert client.get("/api/v1/content").json()["document"]["projects"][0] == {
         "id": identifier, "name": "Demo", "summary": "Summary", "status": "", "details": ["**Details**"],
     }
+
+
+def test_administrator_can_order_lists_and_remove_experience():
+    client, provider, _ = setup({
+        "projects": [{"id": "one"}, {"id": "two"}],
+        "experience": [{"id": "first"}, {"id": "second"}, {"id": "third"}],
+    })
+    assert login(client, provider).headers["Location"] == "/admin/"
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": client.get("/api/v1/admin/session").json()["csrf"]}
+    endpoint = "/api/v1/admin/content"
+    changes = {"revision": 1, "edits": [], "removeExperience": ["second"],
+               "experienceOrder": ["third", "first"], "projectOrder": ["two", "one"]}
+    invalid = {**changes, "projectOrder": ["two", "two"]}
+    assert client.patch(endpoint, headers=headers, json=invalid).status_code == 422
+    assert client.get("/api/v1/content").json()["revision"] == 1
+    assert client.patch(endpoint, headers=headers, json=changes).status_code == 200
+    assert client.get("/api/v1/content").json() == {"revision": 2, "document": {
+        "projects": [{"id": "two"}, {"id": "one"}],
+        "experience": [{"id": "third"}, {"id": "first"}],
+    }}
+    assert client.patch(endpoint, headers=headers, json=changes).status_code == 409

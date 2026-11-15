@@ -46,7 +46,25 @@ def permitted_url(value, image=False):
         return False
 
 
-def edit_document(document, edits):
+def update_order(document, section, order, removed=()):
+    if order is None and not removed:
+        return
+    entries = {entry["id"]: entry for entry in document.get(section, [])}
+    removed_ids = set(removed)
+    if len(removed_ids) != len(removed) or not removed_ids.issubset(entries):
+        raise HTTPException(422, "Проверь список удаляемых записей.")
+    for identifier in removed_ids:
+        del entries[identifier]
+    if order is None:
+        order = list(entries)
+    if len(order) != len(entries) or set(order) != entries.keys():
+        raise HTTPException(422, "Порядок должен включать все оставшиеся записи по одному разу.")
+    document[section] = [entries[identifier] for identifier in order]
+
+
+def edit_document(document, edits, *, project_order=None, experience_order=None, remove_experience=()):
+    if not (edits or project_order is not None or experience_order is not None or remove_experience):
+        raise HTTPException(422, "Нет изменений для сохранения.")
     result = deepcopy(document)
     seen = set()
     for edit in edits:
@@ -83,6 +101,8 @@ def edit_document(document, edits):
                     item["details"] = [values[-1]]
                     continue
         raise HTTPException(422, "Проверь поля записи.")
+    update_order(result, "projects", project_order)
+    update_order(result, "experience", experience_order, remove_experience)
     return result
 
 
@@ -106,7 +126,7 @@ class Repository:
             raise HTTPException(404, "Портфолио ещё не заполнено.")
         return dict(row)
 
-    async def save_content(self, revision, edits):
+    async def save_content(self, revision, edits, **list_changes):
         async with self.db.transaction() as conn:
             row = (await conn.execute(
                 sa.select(content.c.document, content.c.revision)
@@ -114,7 +134,7 @@ class Repository:
             )).mappings().one_or_none()
             if not row or row["revision"] != revision:
                 raise HTTPException(409, "Страница изменилась. Обнови её перед сохранением.")
-            document = edit_document(row["document"], edits)
+            document = edit_document(row["document"], edits, **list_changes)
             next_revision = revision + 1
             await conn.execute(content.update().where(content.c.id == 1).values(
                 document=document, revision=next_revision,

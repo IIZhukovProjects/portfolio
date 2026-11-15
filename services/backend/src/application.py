@@ -32,7 +32,10 @@ class API(Portfolio):
 
     async def update_content(self, *, context, body):
         await context.runtime.identity.require_admin(context.request, write=True)
-        result = await context.runtime.repository.save_content(body.revision, body.edits)
+        result = await context.runtime.repository.save_content(
+            body.revision, body.edits, project_order=body.project_order,
+            experience_order=body.experience_order, remove_experience=body.remove_experience or (),
+        )
         return JSONResponse(result, headers=NO_STORE)
 
     async def upload_image(self, *, context):

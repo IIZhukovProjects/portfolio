@@ -179,8 +179,12 @@ function openEditor() {
   currentEdit = {edits, profileEdit: edits.find(edit => edit.key === 'profile'), files: new Map(), uploads: new Map()};
   document.body.classList.add('inline-editing');
   bar.querySelector('[data-cancel]').focus({preventScroll: true});
-  if (location.hash === '#projects') {
-    const list = content.querySelector('.projects');
+  const section = location.hash.slice(1);
+  if (section !== 'projects' && section !== 'experience') return;
+  const list = content.querySelector(section === 'projects' ? '.projects' : '.records');
+  currentEdit.list = {section, element: list, removed: new Set()};
+  for (const entry of list.children) addEntryControls(entry, currentEdit.list);
+  if (section === 'projects') {
     const add = document.createElement('button');
     add.className = 'add-image';
     add.type = 'button';
@@ -192,11 +196,62 @@ function openEditor() {
   }
 }
 
+function updateMoveControls(list) {
+  const rows = [...list.children];
+  for (const [index, row] of rows.entries()) {
+    row.querySelector('[data-move="up"]').disabled = index === 0;
+    row.querySelector('[data-move="down"]').disabled = index === rows.length - 1;
+  }
+}
+
+function addEntryControls(entry, list) {
+  const controls = document.createElement('div');
+  controls.className = 'entry-controls';
+  const name = entry.querySelector('h2').textContent.trim() || 'новый проект';
+  controls.innerHTML = `<button type="button" data-move="up" aria-label="Переместить выше">↑</button>
+    <button type="button" data-move="down" aria-label="Переместить ниже">↓</button>
+    ${list.section === 'experience' ? '<button type="button" data-remove>Удалить</button>' : ''}`;
+  entry.append(controls);
+  const up = controls.querySelector('[data-move="up"]');
+  const down = controls.querySelector('[data-move="down"]');
+  up.setAttribute('aria-label', `Переместить выше: ${name}`);
+  down.setAttribute('aria-label', `Переместить ниже: ${name}`);
+  up.disabled = !entry.previousElementSibling;
+  down.disabled = !entry.nextElementSibling;
+  controls.addEventListener('click', event => {
+    const button = event.target.closest('button');
+    if (busy || !button) return;
+    if (button.hasAttribute('data-remove')) {
+      const next = entry.nextElementSibling || entry.previousElementSibling;
+      list.removed.add(entry.dataset.editEntry.split('/')[1]);
+      entry.remove();
+      updateMoveControls(list.element);
+      (next?.querySelector('[data-remove]') || save).focus({preventScroll: true});
+      return;
+    }
+    if (button === up && entry.previousElementSibling) entry.previousElementSibling.before(entry);
+    if (button === down && entry.nextElementSibling) entry.nextElementSibling.after(entry);
+    updateMoveControls(list.element);
+    (button.disabled ? (button === up ? down : up) : button).focus({preventScroll: true});
+  });
+}
+
+function listChanges(list) {
+  if (!list) return {};
+  const order = [...list.element.children].map(entry => entry.dataset.editEntry.split('/')[1]);
+  const original = profile[list.section].map(entry => entry.id);
+  if (order.length === original.length && order.every((id, index) => id === original[index])) return {};
+  return list.section === 'projects'
+    ? {projectOrder: order}
+    : {experienceOrder: order, removeExperience: [...list.removed]};
+}
+
 function addProject(list) {
   const id = 'project-' + crypto.randomUUID().replaceAll('-', '');
   const key = 'projects/' + id;
   const entry = document.createElement('article');
   entry.className = 'record project-draft';
+  entry.dataset.editEntry = key;
   entry.innerHTML = `<h2 data-edit-type="label" data-placeholder="Название проекта"></h2>
     <div class="record-description" data-edit-type="text"></div>
     <div class="detail-text" data-edit-type="text"></div>`;
@@ -209,6 +264,8 @@ function addProject(list) {
   edit.fields[1].input.placeholder = 'Краткое описание';
   edit.fields[3].input.placeholder = 'Подробности проекта';
   currentEdit.edits.push({...edit, key, originalValues: ['', '', '', '']});
+  addEntryControls(entry, currentEdit.list);
+  updateMoveControls(list);
   title.focus();
 }
 
@@ -312,10 +369,12 @@ bar.addEventListener('submit', async event => {
   event.preventDefault();
   if (busy || !currentEdit) return;
   const edit = currentEdit;
+  const order = listChanges(edit.list);
   const changes = edit.edits
+    .filter(entry => !edit.list?.removed.has(entry.key.split('/')[1]))
     .map(entry => ({entry, values: entry.fields.map(readField)}))
     .filter(({entry, values}) => values.some((value, index) => entry.originalValues[index] !== value));
-  if (!changes.length) {
+  if (!changes.length && !Object.keys(order).length) {
     refreshPage();
     return;
   }
@@ -354,7 +413,7 @@ bar.addEventListener('submit', async event => {
     const response = await fetch(adminApi + '/content', {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json', 'X-CSRF-Token': editorSession.csrf},
-      body: JSON.stringify({revision: contentRevision, edits})
+      body: JSON.stringify({revision: contentRevision, edits, ...order})
     });
     if (!response.ok) throw new Error(await requestError(response));
     const result = await response.json();
