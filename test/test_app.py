@@ -97,7 +97,7 @@ def setup():
     database, storage, provider = Repository(), Storage(), Provider()
     settings = SimpleNamespace(
         portfolio_origin=ORIGIN, oidc_issuer=ISSUER, oidc_client_id="portfolio",
-        oidc_client_secret=SecretStr("testing-client-secret"), s3_public_base=PUBLIC_S3,
+        oidc_client_secret=SecretStr("testing-client-secret"), portfolio_media_base=PUBLIC_S3,
     )
     application = create_app()
     upstream = httpx.AsyncClient(transport=httpx.MockTransport(provider.request))

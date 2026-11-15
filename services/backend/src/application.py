@@ -38,7 +38,7 @@ class API(Portfolio):
     async def upload_image(self, *, context):
         runtime = context.runtime
         await runtime.identity.require_admin(context.request, write=True)
-        public_base = runtime.settings.s3_public_base
+        public_base = runtime.settings.portfolio_media_base
         if runtime.identity.secure and not public_base:
             raise HTTPException(503, "Публичный адрес хранилища не настроен.")
         data = bytearray()

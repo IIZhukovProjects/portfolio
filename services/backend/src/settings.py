@@ -7,4 +7,4 @@ class Settings(GeneratedSettings):
     oidc_issuer: str = ""
     oidc_client_id: str = ""
     oidc_client_secret: SecretStr = SecretStr("")
-    s3_public_base: str = ""
+    portfolio_media_base: str = ""

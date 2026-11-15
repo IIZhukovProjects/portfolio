@@ -14,8 +14,8 @@ from settings import Settings
 
 async def main():
     settings = Settings()
-    if settings.portfolio_origin.startswith("https://") and not settings.s3_public_base:
-        raise SystemExit("Set S3_PUBLIC_BASE before importing production content.")
+    if settings.portfolio_origin.startswith("https://") and not settings.portfolio_media_base:
+        raise SystemExit("Set PORTFOLIO_MEDIA_BASE before importing production content.")
     database = Database(settings.database_url.get_secret_value())
     storage = S3(settings)
     try:
@@ -33,7 +33,7 @@ async def main():
         folder = Path(__file__).parent
         document = json.loads(folder.joinpath("portfolio-content.json").read_text(encoding="utf-8"))
         document["photo"] = await upload_image(
-            storage, folder.joinpath("initial-photo.jpg").read_bytes(), settings.s3_public_base,
+            storage, folder.joinpath("initial-photo.jpg").read_bytes(), settings.portfolio_media_base,
         )
         print("Content imported." if await repository.seed(document) else "Content already exists.")
     finally:
