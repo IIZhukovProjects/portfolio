@@ -1,0 +1,22 @@
+apiVersion: platform.iizhukov.dev/v1alpha1
+kind: Deployment
+deployment:
+  environments:
+    prod:
+      enabled: true
+      strategy: rolling
+      defaults:
+        instances: 1
+        placement:
+          machines: 1
+          datacenters: 1
+        resources:
+          cpuCores: 0.1
+          memoryMiB: 128
+          diskMiB: 512
+      workloads:
+        frontend:
+          resources:
+            cpuCores: 0.05
+            memoryMiB: 32
+            diskMiB: 128

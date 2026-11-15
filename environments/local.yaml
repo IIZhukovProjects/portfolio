@@ -1,0 +1,13 @@
+apiVersion: platform.iizhukov.dev/v1alpha1
+kind: Environment
+environment:
+  name: local
+  runtime: local
+  resourceProvider: docker
+  environment:
+    PYTHONUNBUFFERED: '1'
+    TZ: UTC
+  services:
+    backend:
+      environment:
+        PORTFOLIO_ORIGIN: http://localhost:8080

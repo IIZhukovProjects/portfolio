@@ -1,0 +1,35 @@
+apiVersion: platform.iizhukov.dev/v1alpha1
+kind: Infrastructure
+infrastructure:
+  modes:
+    local:
+      resourceProvider: docker
+      observabilityEnabled: true
+      ports:
+        postgres: 25432
+        s3: 29000
+        grafana: 23000
+        otlp_http: 24318
+        otlp_grpc: 24317
+    platform:
+      resourceProvider: platform
+      observabilityEnabled: true
+
+  resources:
+    postgres:
+      kind: postgresql-cluster
+      version: '17'
+      availability: single
+      databases:
+        portfolio:
+          name: portfolio
+      backups: none
+    s3:
+      kind: s3-bucket
+      visibility: public
+      backups: none
+
+  observability:
+    provider: platform
+    signals: [logs, metrics, traces]
+    credentials: workload

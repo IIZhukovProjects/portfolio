@@ -1,0 +1,18 @@
+apiVersion: platform.iizhukov.dev/v1alpha1
+kind: Application
+application:
+  name: portfolio
+  description: Персональный сайт и редактор портфолио
+  source:
+    repository: https://github.com/IIZhukovProjects/portfolio.git
+    branch: main
+  apps:
+    - apps/frontend/app.yaml
+  services:
+    - services/backend/service.yaml
+  infrastructure: infrastructure.yaml
+  deployment: deploy.yaml
+  ingress: ingress.yaml
+  environments:
+    local: environments/local.yaml
+    prod: environments/prod.yaml

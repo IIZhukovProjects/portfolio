@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: Portfolio API
+  version: 1.0.0
+paths:
+  /api/v1/content:
+    get:
+      tags: [portfolio]
+      operationId: readContent
+      responses:
+        '200': {description: Published content and revision}
+  /api/v1/admin/login:
+    get:
+      tags: [portfolio]
+      operationId: login
+      responses:
+        '200': {description: Authorization request handled}
+        '303': {description: Redirect to the platform OIDC provider}
+  /api/v1/admin/callback:
+    get:
+      tags: [portfolio]
+      operationId: callback
+      responses:
+        '200': {description: Authorization request handled}
+        '303': {description: Return to the editor}
+  /api/v1/admin/session:
+    get:
+      tags: [portfolio]
+      operationId: getSession
+      responses:
+        '200': {description: Confirmed administrator session}
+        '401': {description: Sign-in required}
+        '403': {description: Administrator access required}
+    delete:
+      tags: [portfolio]
+      operationId: logout
+      responses:
+        '204': {description: Session deleted}
+  /api/v1/admin/content:
+    patch:
+      tags: [portfolio]
+      operationId: updateContent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, edits]
+              properties:
+                revision: {type: integer, minimum: 0}
+                edits:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [key, values]
+                    properties:
+                      key: {type: string, maxLength: 100}
+                      values:
+                        type: array
+                        maxItems: 5
+                        items: {type: string, maxLength: 100000}
+      responses:
+        '200': {description: Updated content and revision}
+        '409': {description: Revision conflict}
+  /api/v1/admin/media:
+    post:
+      tags: [portfolio]
+      operationId: uploadImage
+      description: Raw image bytes. Returns the public URL.
+      responses:
+        '201': {description: Uploaded public image}
+  /api/v1/media/{name}:
+    get:
+      tags: [portfolio]
+      operationId: readLocalImage
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: Image from local object storage}
+        '404': {description: Image unavailable}

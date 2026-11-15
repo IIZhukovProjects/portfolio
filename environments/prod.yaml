@@ -1,0 +1,18 @@
+apiVersion: platform.iizhukov.dev/v1alpha1
+kind: Environment
+environment:
+  name: prod
+  runtime: platform
+  resourceProvider: platform
+  environment:
+    PYTHONUNBUFFERED: '1'
+    TZ: UTC
+  services:
+    backend:
+      environment:
+        PORTFOLIO_ORIGIN: https://iizhukov.ru
+        OIDC_ISSUER: https://platform.iizhukov.ru/api/v1/oidc
+        OIDC_CLIENT_ID: portfolio
+        OIDC_CLIENT_SECRET:
+          secretRef:
+            id: sec_140bbba641984855a354959a65ea19cf
