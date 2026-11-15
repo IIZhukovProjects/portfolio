@@ -357,7 +357,9 @@ bar.addEventListener('submit', async event => {
       body: JSON.stringify({revision: contentRevision, edits})
     });
     if (!response.ok) throw new Error(await requestError(response));
-    replaceContent(await response.json());
+    const result = await response.json();
+    replaceContent(result);
+    cacheContent(result);
     if (currentEdit === edit) refreshPage();
     else if (!currentEdit) renderPage();
   } catch (error) {
@@ -380,7 +382,7 @@ async function requestError(response) {
 }
 
 async function connectAdmin() {
-  if (location.protocol === 'file:' || !/\/admin\/?$/.test(location.pathname)) return;
+  if (location.protocol === 'file:' || !isAdminPage) return;
   try {
     const response = await fetch(adminApi + '/session', {cache: 'no-store'});
     if (!response.ok) return;

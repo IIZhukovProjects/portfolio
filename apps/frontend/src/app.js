@@ -1,8 +1,13 @@
 const profile = {};
 let contentRevision = 0;
 let contentReady = false;
+let contentLoading = true;
 
 const content = document.querySelector('#content');
+const profileSkeleton = content.querySelector('.skeleton')?.outerHTML;
+const contentCacheKey = 'portfolio:public-content:v1';
+const contentCacheTtl = 120_000;
+const isAdminPage = /\/admin(?:\/index\.html|\/)?$/.test(location.pathname);
 const photoUrl = new URL('photo.jpg', document.currentScript.src).href;
 let editorEnabled = false;
 const escapes = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
@@ -198,25 +203,53 @@ function replaceContent(result) {
   }
 }
 
+function readCachedContent() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(contentCacheKey));
+    const age = Date.now() - cached?.savedAt;
+    if (age >= 0 && age < contentCacheTtl) return cached.result;
+  } catch {}
+}
+
+function cacheContent(result) {
+  try {
+    localStorage.setItem(contentCacheKey, JSON.stringify({savedAt: Date.now(), result}));
+  } catch {}
+}
+
+function loadingPage(route) {
+  if (route === '#profile' && profileSkeleton) return profileSkeleton;
+  const row = '<div class="project skeleton-row"><div><span></span><span></span></div><span></span></div>';
+  return `<div class="skeleton" aria-hidden="true">
+    <div class="skeleton-line skeleton-heading skeleton-page-title"></div>
+    <div class="projects">${row.repeat(route.includes('/') ? 1 : 3)}</div>
+  </div>`;
+}
+
 function renderPage(focusHeading = false) {
-  const isAdminPath = /\/admin(?:\/index\.html|\/)?$/.test(location.pathname);
-  const requested = isAdminPath && !editorEnabled
+  const requested = isAdminPage && !editorEnabled
     ? '#admin'
     : location.hash || '#profile';
-  const hash = pages.has(requested) && (requested !== '#admin' || isAdminPath) ? requested : '#profile';
+  const hash = pages.has(requested) && (requested !== '#admin' || isAdminPage) ? requested : '#profile';
   document.body.classList.toggle('admin-view', hash === '#admin');
   document.body.classList.toggle('editor-view', editorEnabled && hash !== '#admin');
+  const parent = (contentLoading ? requested : hash).split('/')[0];
+  for (const link of navigation) {
+    if (link.hash === parent) link.setAttribute('aria-current', requested === parent ? 'page' : 'location');
+    else link.removeAttribute('aria-current');
+  }
+  const loading = contentLoading && !contentReady && hash !== '#admin';
+  content.setAttribute('aria-busy', String(loading));
+  if (loading) {
+    content.innerHTML = `<div class="page">${loadingPage(requested)}</div>`;
+    return;
+  }
   if (!contentReady && hash !== '#admin') {
     content.innerHTML = '<div class="page"><h1>Портфолио</h1><p class="intro">Контент пока недоступен.</p></div>';
     return;
   }
   content.innerHTML = `<div class="page">${pages.get(hash)()}</div>`;
   content.scrollTop = 0;
-  const parent = hash.split('/')[0];
-  for (const link of navigation) {
-    if (link.hash === parent) link.setAttribute('aria-current', hash === parent ? 'page' : 'location');
-    else link.removeAttribute('aria-current');
-  }
   const heading = content.querySelector('h1');
   document.title = hash === '#profile'
     ? 'Илья Жуков · Портфолио'
@@ -226,13 +259,23 @@ function renderPage(focusHeading = false) {
 
 window.addEventListener('hashchange', () => renderPage(true));
 const portfolioReady = (async () => {
-  if (!/\/admin\/?$/.test(location.pathname)) content.textContent = '';
   try {
-    const response = await fetch('/api/v1/content');
-    if (response.ok) replaceContent(await response.json());
+    const cached = !isAdminPage && readCachedContent();
+    if (cached) {
+      replaceContent(cached);
+      return;
+    }
+    if (isAdminPage || location.hash && location.hash !== '#profile') renderPage();
+    const response = await fetch('/api/v1/content', {cache: 'no-store'});
+    if (response.ok) {
+      const result = await response.json();
+      replaceContent(result);
+      cacheContent(result);
+    }
   } catch {
     // renderPage supplies the unavailable state.
+  } finally {
+    contentLoading = false;
+    renderPage();
   }
-  renderPage();
 })();
-if (/\/admin\/?$/.test(location.pathname)) renderPage();
