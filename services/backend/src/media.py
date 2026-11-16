@@ -1,6 +1,7 @@
 import asyncio
 from io import BytesIO
 import re
+from threading import Lock
 from uuid import uuid4
 
 from botocore.exceptions import ClientError
@@ -11,19 +12,21 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 MAX_UPLOAD = 5 * 1024 * 1024
 MAX_PIXELS = 24_000_000
 NAME = re.compile(r"[0-9a-f]{32}\.webp")
+_conversion_lock = Lock()
 
 
 def convert_image(data):
-    with Image.open(BytesIO(data)) as source:
+    with _conversion_lock, Image.open(BytesIO(data)) as source:
         if source.format not in ("JPEG", "PNG", "WEBP", "GIF", "AVIF"):
             raise ValueError("Unsupported format")
         if source.width * source.height > MAX_PIXELS:
             raise ValueError("Image exceeds dimension limit")
-        image = ImageOps.exif_transpose(source)
-        image.thumbnail((2048, 2048))
-        transparent = "A" in image.getbands() or "transparency" in image.info
+        source.thumbnail((2048, 2048))
+        ImageOps.exif_transpose(source, in_place=True)
+        transparent = "A" in source.getbands() or "transparency" in source.info
         output = BytesIO()
-        image.convert("RGBA" if transparent else "RGB").save(output, format="WEBP", quality=88)
+        with source.convert("RGBA" if transparent else "RGB") as converted:
+            converted.save(output, format="WEBP", quality=88)
         return output.getvalue()
 
 

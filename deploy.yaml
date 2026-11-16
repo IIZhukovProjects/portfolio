@@ -15,6 +15,10 @@ deployment:
           memoryMiB: 128
           diskMiB: 512
       workloads:
+        backend:
+          resources:
+            cpuCores: 0.5
+            memoryMiB: 512
         frontend:
           resources:
             cpuCores: 0.05
