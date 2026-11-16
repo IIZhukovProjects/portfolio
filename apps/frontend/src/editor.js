@@ -209,7 +209,7 @@ function updateMoveControls(list) {
 function addEntryControls(entry, list) {
   const controls = document.createElement('div');
   controls.className = 'entry-controls';
-  const name = entry.querySelector('h2').textContent.trim() || 'новый проект';
+  const name = entry.querySelector('h2').textContent.trim() || (list.section === 'education' ? 'новая запись' : 'новый проект');
   controls.innerHTML = `<button type="button" data-move="up" aria-label="Переместить выше">↑</button>
     <button type="button" data-move="down" aria-label="Переместить ниже">↓</button>
     <button type="button" data-remove>Удалить</button>`;
