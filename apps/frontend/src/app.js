@@ -248,7 +248,7 @@ function renderPage(focusHeading = false) {
     content.innerHTML = '<div class="page"><h1>Портфолио</h1><p class="intro">Контент пока недоступен.</p></div>';
     return;
   }
-  content.innerHTML = `<div class="page page-enter">${pages.get(hash)()}</div>`;
+  content.innerHTML = `<div class="page${focusHeading ? ' page-enter' : ''}">${pages.get(hash)()}</div>`;
   content.scrollTop = 0;
   const heading = content.querySelector('h1');
   document.title = hash === '#profile'
