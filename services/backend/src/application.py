@@ -34,7 +34,8 @@ class API(Portfolio):
         await context.runtime.identity.require_admin(context.request, write=True)
         result = await context.runtime.repository.save_content(
             body.revision, body.edits, project_order=body.project_order,
-            experience_order=body.experience_order, remove_experience=body.remove_experience or (),
+            experience_order=body.experience_order, education_order=body.education_order,
+            remove_experience=body.remove_experience or (),
             remove_projects=body.remove_projects or (), remove_education=body.remove_education or (),
         )
         return JSONResponse(result, headers=NO_STORE)

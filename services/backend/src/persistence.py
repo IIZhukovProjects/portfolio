@@ -49,7 +49,8 @@ def permitted_url(value, image=False):
 def update_order(document, section, order, removed=()):
     if order is None and not removed:
         return
-    entries = {entry["id"]: entry for entry in document.get(section, [])}
+    items = document.get(section, [])
+    entries = dict(enumerate(items)) if section == "education" else {entry["id"]: entry for entry in items}
     removed_ids = set(removed)
     if len(removed_ids) != len(removed) or not removed_ids.issubset(entries):
         raise HTTPException(422, "Проверь список удаляемых записей.")
@@ -63,10 +64,10 @@ def update_order(document, section, order, removed=()):
 
 
 def edit_document(
-    document, edits, *, project_order=None, experience_order=None,
+    document, edits, *, project_order=None, experience_order=None, education_order=None,
     remove_experience=(), remove_projects=(), remove_education=(),
 ):
-    if not (edits or project_order is not None or experience_order is not None
+    if not (edits or project_order is not None or experience_order is not None or education_order is not None
             or remove_experience or remove_projects or remove_education):
         raise HTTPException(422, "Нет изменений для сохранения.")
     result = deepcopy(document)
@@ -86,6 +87,10 @@ def edit_document(
             index = int(item_id)
             entries = result.get(section, [])
             width = 3 if section == "contacts" else 4
+            if (section == "education" and index == len(entries) and len(values) == width
+                    and all(value.strip() for value in values)):
+                result.setdefault(section, []).append(list(values))
+                continue
             if index < len(entries) and len(values) == width and all(value.strip() for value in values):
                 if section == "education" or permitted_url(values[1]):
                     entries[index][:width] = values
@@ -107,12 +112,7 @@ def edit_document(
         raise HTTPException(422, "Проверь поля записи.")
     update_order(result, "projects", project_order, remove_projects)
     update_order(result, "experience", experience_order, remove_experience)
-    if remove_education:
-        education = result.get("education", [])
-        removed = set(remove_education)
-        if len(removed) != len(remove_education) or not removed.issubset(range(len(education))):
-            raise HTTPException(422, "Проверь список удаляемых записей образования.")
-        result["education"] = [entry for index, entry in enumerate(education) if index not in removed]
+    update_order(result, "education", education_order, remove_education)
     return result
 
 

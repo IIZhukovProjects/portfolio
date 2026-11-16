@@ -69,6 +69,10 @@ paths:
                   type: array
                   maxItems: 1000
                   items: {type: string, minLength: 1, maxLength: 100}
+                educationOrder:
+                  type: array
+                  maxItems: 1000
+                  items: {type: integer, minimum: 0}
                 removeExperience:
                   type: array
                   maxItems: 1000

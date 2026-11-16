@@ -62,7 +62,7 @@ function describeEdit(key, draft) {
     };
   }
   if (section === 'education') {
-    const item = profile.education[id];
+    const item = draft || profile.education[id];
     return {
       title: 'Образование',
       fields: [labelField('Учебное заведение', item[0]), labelField('Направление', item[1]), labelField('Период', item[2]), textField('Описание', item[3])],
@@ -176,7 +176,7 @@ function openEditor() {
     }
     return {...edit, key, originalValues: edit.fields.map(field => field.value)};
   });
-  if (!edits.length && section !== 'projects') return;
+  if (!edits.length && !['projects', 'education'].includes(section)) return;
   currentEdit = {edits, profileEdit: edits.find(edit => edit.key === 'profile'), files: new Map(), uploads: new Map()};
   document.body.classList.add('inline-editing');
   bar.querySelector('[data-cancel]').focus({preventScroll: true});
@@ -184,14 +184,16 @@ function openEditor() {
   const list = content.querySelector(section === 'projects' ? '.projects' : '.records');
   currentEdit.list = {section, element: list, removed: new Set()};
   for (const entry of list.children) addEntryControls(entry, currentEdit.list);
-  if (section === 'projects') {
+  if (section === 'projects' || section === 'education') {
     const add = document.createElement('button');
     add.className = 'add-image';
     add.type = 'button';
-    add.textContent = '+ Добавить проект';
+    add.textContent = section === 'education' ? '+ Добавить образование' : '+ Добавить проект';
     list.after(add);
     add.addEventListener('click', () => {
-      if (!busy) addProject(list);
+      if (busy) return;
+      if (section === 'education') addEducation(list);
+      else addProject(list);
     });
   }
 }
@@ -208,8 +210,8 @@ function addEntryControls(entry, list) {
   const controls = document.createElement('div');
   controls.className = 'entry-controls';
   const name = entry.querySelector('h2').textContent.trim() || 'новый проект';
-  controls.innerHTML = `${list.section !== 'education' ? `<button type="button" data-move="up" aria-label="Переместить выше">↑</button>
-    <button type="button" data-move="down" aria-label="Переместить ниже">↓</button>` : ''}
+  controls.innerHTML = `<button type="button" data-move="up" aria-label="Переместить выше">↑</button>
+    <button type="button" data-move="down" aria-label="Переместить ниже">↓</button>
     <button type="button" data-remove>Удалить</button>`;
   entry.append(controls);
   const up = controls.querySelector('[data-move="up"]');
@@ -226,7 +228,7 @@ function addEntryControls(entry, list) {
     if (button.hasAttribute('data-remove')) {
       const next = entry.nextElementSibling || entry.previousElementSibling;
       const key = entry.dataset.editEntry;
-      if (entry.classList.contains('project-draft')) {
+      if (entry.matches('.project-draft, .education-draft')) {
         currentEdit.edits = currentEdit.edits.filter(edit => edit.key !== key);
       } else {
         list.removed.add(key.split('/')[1]);
@@ -246,13 +248,33 @@ function addEntryControls(entry, list) {
 function listChanges(list) {
   if (!list) return {};
   const removed = [...list.removed];
-  if (list.section === 'education') return removed.length ? {removeEducation: removed.map(Number)} : {};
   const order = [...list.element.children].map(entry => entry.dataset.editEntry.split('/')[1]);
-  const original = profile[list.section].map(entry => entry.id);
+  const original = profile[list.section].map((entry, index) => list.section === 'education' ? String(index) : entry.id);
   if (order.length === original.length && order.every((id, index) => id === original[index])) return {};
+  if (list.section === 'education') return {educationOrder: order.map(Number), removeEducation: removed.map(Number)};
   return list.section === 'projects'
     ? {projectOrder: order, removeProjects: removed}
     : {experienceOrder: order, removeExperience: removed};
+}
+
+function addEducation(list) {
+  const id = 'draft-' + crypto.randomUUID();
+  const key = 'education/' + id;
+  const values = ['', '', '', ''];
+  list.insertAdjacentHTML('beforeend', writeRecord(values, id));
+  const entry = list.lastElementChild;
+  entry.classList.add('education-draft');
+  const edit = describeEdit(key, values);
+  for (const element of entry.querySelectorAll('[data-edit-field]')) {
+    const field = edit.fields[Number(element.dataset.editField)];
+    activateField(field, element);
+    if (field.input) field.input.placeholder = field.label;
+    else element.dataset.placeholder = field.label;
+  }
+  currentEdit.edits.push({...edit, key, originalValues: values, educationDraft: entry});
+  addEntryControls(entry, currentEdit.list);
+  updateMoveControls(list);
+  entry.querySelector('h2').focus();
 }
 
 function addProject(list) {
@@ -378,11 +400,19 @@ bar.addEventListener('submit', async event => {
   event.preventDefault();
   if (busy || !currentEdit) return;
   const edit = currentEdit;
+  if (edit.list?.section === 'education') {
+    let index = profile.education.length;
+    for (const entry of edit.edits) {
+      if (!entry.educationDraft) continue;
+      entry.key = 'education/' + index++;
+      entry.educationDraft.dataset.editEntry = entry.key;
+    }
+  }
   const order = listChanges(edit.list);
   const changes = edit.edits
     .filter(entry => !edit.list?.removed.has(entry.key.split('/')[1]))
     .map(entry => ({entry, values: entry.fields.map(readField)}))
-    .filter(({entry, values}) => values.some((value, index) => entry.originalValues[index] !== value));
+    .filter(({entry, values}) => entry.educationDraft || values.some((value, index) => entry.originalValues[index] !== value));
   if (!changes.length && !Object.keys(order).length) {
     refreshPage();
     return;

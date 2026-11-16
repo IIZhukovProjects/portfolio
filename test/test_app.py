@@ -177,7 +177,25 @@ def test_administrator_can_publish_a_new_project():
     }
 
 
-def test_administrator_can_order_lists_and_remove_experience():
+def test_administrator_can_add_and_position_education():
+    client, provider, _ = setup({"education": [["University", "Degree", "2022", "Details"]]})
+    assert login(client, provider).headers["Location"] == "/admin/"
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": client.get("/api/v1/admin/session").json()["csrf"]}
+    first = ["Course", "Topic", "2024", "Details"]
+    second = ["School", "Track", "2025", "Details"]
+    payload = {
+        "revision": 1,
+        "edits": [{"key": "education/1", "values": first}, {"key": "education/2", "values": second}],
+        "educationOrder": [2, 0, 1],
+    }
+    result = client.patch("/api/v1/admin/content", headers=headers, json=payload)
+    assert result.status_code == 200
+    assert result.json()["document"]["education"] == [
+        second, ["University", "Degree", "2022", "Details"], first,
+    ]
+
+
+def test_administrator_can_reorder_and_remove_entries():
     client, provider, _ = setup({
         "projects": [{"id": "one"}, {"id": "two"}, {"id": "obsolete"}],
         "experience": [{"id": "first"}, {"id": "second"}, {"id": "third"}],
@@ -187,18 +205,21 @@ def test_administrator_can_order_lists_and_remove_experience():
     headers = {"Origin": ORIGIN, "X-CSRF-Token": client.get("/api/v1/admin/session").json()["csrf"]}
     endpoint = "/api/v1/admin/content"
     changes = {
-        "revision": 1, "edits": [], "removeExperience": ["second"],
+        "revision": 1, "edits": [{"key": "education/2", "values": ["Course", "Role", "2024", "Description"]}],
+        "removeExperience": ["second"],
         "experienceOrder": ["third", "first"], "projectOrder": ["two", "one"],
-        "removeProjects": ["obsolete"], "removeEducation": [1],
+        "removeProjects": ["obsolete"], "educationOrder": [2, 0], "removeEducation": [1],
     }
     invalid = {**changes, "projectOrder": ["two", "two"]}
     assert client.patch(endpoint, headers=headers, json=invalid).status_code == 422
     assert client.patch(endpoint, headers=headers, json={**changes, "removeEducation": [3]}).status_code == 422
+    for invalid_order in ([2, 2], [2], [2, 1]):
+        assert client.patch(endpoint, headers=headers, json={**changes, "educationOrder": invalid_order}).status_code == 422
     assert client.get("/api/v1/content").json()["revision"] == 1
     assert client.patch(endpoint, headers=headers, json=changes).status_code == 200
     assert client.get("/api/v1/content").json() == {"revision": 2, "document": {
         "projects": [{"id": "two"}, {"id": "one"}],
         "experience": [{"id": "third"}, {"id": "first"}],
-        "education": [["University"], ["Course"]],
+        "education": [["Course", "Role", "2024", "Description"], ["University"]],
     }}
     assert client.patch(endpoint, headers=headers, json=changes).status_code == 409

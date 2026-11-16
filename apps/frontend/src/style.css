@@ -530,7 +530,7 @@ h1[tabindex="-1"]:focus { outline: none; }
   .inline-editor { bottom: calc(var(--dock-bottom) + var(--dock-height) + 10px); }
 }
 
-.project-draft [contenteditable]:empty::before { content: attr(data-placeholder); color: var(--muted); }
+:is(.project-draft, .education-draft) [contenteditable]:empty::before { content: attr(data-placeholder); color: var(--muted); }
 .project-draft .detail-text { margin-top: 10px; }
 
 .entry-controls {
