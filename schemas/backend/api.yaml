@@ -73,6 +73,14 @@ paths:
                   type: array
                   maxItems: 1000
                   items: {type: string, minLength: 1, maxLength: 100}
+                removeProjects:
+                  type: array
+                  maxItems: 1000
+                  items: {type: string, minLength: 1, maxLength: 100}
+                removeEducation:
+                  type: array
+                  maxItems: 1000
+                  items: {type: integer, minimum: 0}
       responses:
         '200': {description: Updated content and revision}
         '409': {description: Revision conflict}

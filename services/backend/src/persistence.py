@@ -62,8 +62,12 @@ def update_order(document, section, order, removed=()):
     document[section] = [entries[identifier] for identifier in order]
 
 
-def edit_document(document, edits, *, project_order=None, experience_order=None, remove_experience=()):
-    if not (edits or project_order is not None or experience_order is not None or remove_experience):
+def edit_document(
+    document, edits, *, project_order=None, experience_order=None,
+    remove_experience=(), remove_projects=(), remove_education=(),
+):
+    if not (edits or project_order is not None or experience_order is not None
+            or remove_experience or remove_projects or remove_education):
         raise HTTPException(422, "Нет изменений для сохранения.")
     result = deepcopy(document)
     seen = set()
@@ -101,8 +105,14 @@ def edit_document(document, edits, *, project_order=None, experience_order=None,
                     item["details"] = [values[-1]]
                     continue
         raise HTTPException(422, "Проверь поля записи.")
-    update_order(result, "projects", project_order)
+    update_order(result, "projects", project_order, remove_projects)
     update_order(result, "experience", experience_order, remove_experience)
+    if remove_education:
+        education = result.get("education", [])
+        removed = set(remove_education)
+        if len(removed) != len(remove_education) or not removed.issubset(range(len(education))):
+            raise HTTPException(422, "Проверь список удаляемых записей образования.")
+        result["education"] = [entry for index, entry in enumerate(education) if index not in removed]
     return result
 
 

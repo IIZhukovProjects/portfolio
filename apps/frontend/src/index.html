@@ -6,14 +6,17 @@
   <meta name="description" content="Илья Жуков — backend-разработчик. Опыт работы, образование, проекты и контакты.">
   <meta name="theme-color" content="#fafafb">
   <title>Илья Жуков · Портфолио</title>
-  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
-  <link rel="stylesheet" href="style.css">
-  <script src="vendor/marked.js" defer></script>
-  <script src="vendor/highlight.js" defer></script>
-  <script src="app.js" defer></script>
-  <script src="editor.js" defer></script>
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/vendor/marked.js" defer></script>
+  <script src="/vendor/highlight.js" defer></script>
+  <script src="/app.js" defer></script>
+  <script src="/editor.js" defer></script>
 </head>
 <body>
+  <script>
+    if (/^\/admin(?:\/index\.html|\/)?$/.test(location.pathname)) document.body.classList.add('admin-view');
+  </script>
   <header class="masthead">
     <div class="shell">
       <a class="wordmark" href="#profile">iizhukov.ru</a>
@@ -42,7 +45,7 @@
     </div>
   </header>
   <script>
-    {
+    if (!document.body.classList.contains('admin-view')) {
       const route = location.hash || '#profile';
       const links = [...document.querySelectorAll('.navigation a')];
       const active = links.find(link => link.hash === route.split('/')[0]) || links[0];

@@ -158,6 +158,7 @@ function activateField(field, element) {
 
 function openEditor() {
   if (busy || currentEdit || !editorEnabled) return;
+  const section = location.hash.slice(1);
   const edits = [...content.querySelectorAll('[data-edit-entry]')].map(entry => {
     const key = entry.dataset.editEntry;
     const edit = describeEdit(key);
@@ -175,12 +176,11 @@ function openEditor() {
     }
     return {...edit, key, originalValues: edit.fields.map(field => field.value)};
   });
-  if (!edits.length) return;
+  if (!edits.length && section !== 'projects') return;
   currentEdit = {edits, profileEdit: edits.find(edit => edit.key === 'profile'), files: new Map(), uploads: new Map()};
   document.body.classList.add('inline-editing');
   bar.querySelector('[data-cancel]').focus({preventScroll: true});
-  const section = location.hash.slice(1);
-  if (section !== 'projects' && section !== 'experience') return;
+  if (!['projects', 'experience', 'education'].includes(section)) return;
   const list = content.querySelector(section === 'projects' ? '.projects' : '.records');
   currentEdit.list = {section, element: list, removed: new Set()};
   for (const entry of list.children) addEntryControls(entry, currentEdit.list);
@@ -208,24 +208,31 @@ function addEntryControls(entry, list) {
   const controls = document.createElement('div');
   controls.className = 'entry-controls';
   const name = entry.querySelector('h2').textContent.trim() || 'новый проект';
-  controls.innerHTML = `<button type="button" data-move="up" aria-label="Переместить выше">↑</button>
-    <button type="button" data-move="down" aria-label="Переместить ниже">↓</button>
-    ${list.section === 'experience' ? '<button type="button" data-remove>Удалить</button>' : ''}`;
+  controls.innerHTML = `${list.section !== 'education' ? `<button type="button" data-move="up" aria-label="Переместить выше">↑</button>
+    <button type="button" data-move="down" aria-label="Переместить ниже">↓</button>` : ''}
+    <button type="button" data-remove>Удалить</button>`;
   entry.append(controls);
   const up = controls.querySelector('[data-move="up"]');
   const down = controls.querySelector('[data-move="down"]');
-  up.setAttribute('aria-label', `Переместить выше: ${name}`);
-  down.setAttribute('aria-label', `Переместить ниже: ${name}`);
-  up.disabled = !entry.previousElementSibling;
-  down.disabled = !entry.nextElementSibling;
+  if (up && down) {
+    up.setAttribute('aria-label', `Переместить выше: ${name}`);
+    down.setAttribute('aria-label', `Переместить ниже: ${name}`);
+    up.disabled = !entry.previousElementSibling;
+    down.disabled = !entry.nextElementSibling;
+  }
   controls.addEventListener('click', event => {
     const button = event.target.closest('button');
     if (busy || !button) return;
     if (button.hasAttribute('data-remove')) {
       const next = entry.nextElementSibling || entry.previousElementSibling;
-      list.removed.add(entry.dataset.editEntry.split('/')[1]);
+      const key = entry.dataset.editEntry;
+      if (entry.classList.contains('project-draft')) {
+        currentEdit.edits = currentEdit.edits.filter(edit => edit.key !== key);
+      } else {
+        list.removed.add(key.split('/')[1]);
+      }
       entry.remove();
-      updateMoveControls(list.element);
+      if (up) updateMoveControls(list.element);
       (next?.querySelector('[data-remove]') || save).focus({preventScroll: true});
       return;
     }
@@ -238,12 +245,14 @@ function addEntryControls(entry, list) {
 
 function listChanges(list) {
   if (!list) return {};
+  const removed = [...list.removed];
+  if (list.section === 'education') return removed.length ? {removeEducation: removed.map(Number)} : {};
   const order = [...list.element.children].map(entry => entry.dataset.editEntry.split('/')[1]);
   const original = profile[list.section].map(entry => entry.id);
   if (order.length === original.length && order.every((id, index) => id === original[index])) return {};
   return list.section === 'projects'
-    ? {projectOrder: order}
-    : {experienceOrder: order, removeExperience: [...list.removed]};
+    ? {projectOrder: order, removeProjects: removed}
+    : {experienceOrder: order, removeExperience: removed};
 }
 
 function addProject(list) {

@@ -35,6 +35,7 @@ class API(Portfolio):
         result = await context.runtime.repository.save_content(
             body.revision, body.edits, project_order=body.project_order,
             experience_order=body.experience_order, remove_experience=body.remove_experience or (),
+            remove_projects=body.remove_projects or (), remove_education=body.remove_education or (),
         )
         return JSONResponse(result, headers=NO_STORE)
 

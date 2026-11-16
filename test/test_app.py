@@ -179,20 +179,26 @@ def test_administrator_can_publish_a_new_project():
 
 def test_administrator_can_order_lists_and_remove_experience():
     client, provider, _ = setup({
-        "projects": [{"id": "one"}, {"id": "two"}],
+        "projects": [{"id": "one"}, {"id": "two"}, {"id": "obsolete"}],
         "experience": [{"id": "first"}, {"id": "second"}, {"id": "third"}],
+        "education": [["University"], ["School"], ["Course"]],
     })
     assert login(client, provider).headers["Location"] == "/admin/"
     headers = {"Origin": ORIGIN, "X-CSRF-Token": client.get("/api/v1/admin/session").json()["csrf"]}
     endpoint = "/api/v1/admin/content"
-    changes = {"revision": 1, "edits": [], "removeExperience": ["second"],
-               "experienceOrder": ["third", "first"], "projectOrder": ["two", "one"]}
+    changes = {
+        "revision": 1, "edits": [], "removeExperience": ["second"],
+        "experienceOrder": ["third", "first"], "projectOrder": ["two", "one"],
+        "removeProjects": ["obsolete"], "removeEducation": [1],
+    }
     invalid = {**changes, "projectOrder": ["two", "two"]}
     assert client.patch(endpoint, headers=headers, json=invalid).status_code == 422
+    assert client.patch(endpoint, headers=headers, json={**changes, "removeEducation": [3]}).status_code == 422
     assert client.get("/api/v1/content").json()["revision"] == 1
     assert client.patch(endpoint, headers=headers, json=changes).status_code == 200
     assert client.get("/api/v1/content").json() == {"revision": 2, "document": {
         "projects": [{"id": "two"}, {"id": "one"}],
         "experience": [{"id": "third"}, {"id": "first"}],
+        "education": [["University"], ["Course"]],
     }}
     assert client.patch(endpoint, headers=headers, json=changes).status_code == 409
